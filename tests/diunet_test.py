@@ -1,5 +1,5 @@
 import torch
-from diunet.diunet import DIUNet
+from diunet import DIUNet
 
 model = DIUNet()
 print(torch.cuda.is_available())
