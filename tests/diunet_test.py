@@ -2,6 +2,7 @@ import torch
 from diunet.diunet import DIUNet
 
 model = DIUNet()
+print(torch.cuda.is_available())
 print(
     f"Trainable parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}"
 )
