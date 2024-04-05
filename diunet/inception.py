@@ -9,24 +9,36 @@ class InceptionResBlock(nn.Module):
     used in the analysis and synthesis path of the U-Net architecture.
     """
 
-    def __init__(self, in_channels: int, out_channels: int, is_output_block=False):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        is_output_block=False,
+        skip_feature_size=0,
+    ):
         """
         Parameters:
         - in_channels: number of channels for input data
         - out_channels: desired number of channels for this block to return
         """
         super(InceptionResBlock, self).__init__()
+        self.out_channels = out_channels
         self.is_output_block = is_output_block
+        self.skip_feature_size = skip_feature_size
 
         # layers for 1st branch
         self.branch1_1x1conv = nn.Conv2d(
-            in_channels=in_channels, out_channels=in_channels, kernel_size=1
+            in_channels=int(in_channels + skip_feature_size),
+            out_channels=in_channels,
+            kernel_size=1,
         )
         self.branch1_bn = nn.BatchNorm2d(in_channels)
 
         # layers for 2nd branch
         self.branch2_1x1conv = nn.Conv2d(
-            in_channels=in_channels, out_channels=in_channels, kernel_size=1
+            in_channels=int(in_channels + skip_feature_size),
+            out_channels=in_channels,
+            kernel_size=1,
         )
         self.branch2_3x3conv = nn.Conv2d(
             in_channels=in_channels,
@@ -38,7 +50,9 @@ class InceptionResBlock(nn.Module):
 
         # layers for 3rd branch
         self.branch3_1x1conv = nn.Conv2d(
-            in_channels=in_channels, out_channels=in_channels, kernel_size=1
+            in_channels=int(in_channels + skip_feature_size),
+            out_channels=in_channels,
+            kernel_size=1,
         )
         self.branch3_3x3conv1 = nn.Conv2d(
             in_channels=in_channels,
@@ -66,15 +80,19 @@ class InceptionResBlock(nn.Module):
             nn.BatchNorm2d(out_channels),
         )
 
-    def forward(self, x):
-        x1 = self.branch1_1x1conv(x)
+    def forward(self, x, skip_features=None):
+        x_start = x
+        if self.skip_feature_size:
+            x_start = torch.cat([x_start, skip_features], dim=0)
+
+        x1 = self.branch1_1x1conv(x_start)
         x1 = F.relu(self.branch1_bn(x1))
 
-        x2 = self.branch2_1x1conv(x)
+        x2 = self.branch2_1x1conv(x_start)
         x2 = self.branch2_3x3conv(x2)
         x2 = F.relu(self.branch2_bn(x2))
 
-        x3 = self.branch3_1x1conv(x)
+        x3 = self.branch3_1x1conv(x_start)
         x3 = self.branch3_3x3conv1(x3)
         x3 = F.relu(self.branch3_bn1(x3))
         x3 = self.branch3_3x3conv2(x3)

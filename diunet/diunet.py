@@ -11,23 +11,30 @@ class DIUNet(nn.Module):
 
     def __init__(self, channel_scale=1, dense_block_depth_scale=1):
         super(DIUNet, self).__init__()
+        skip_features_size_stack = []
 
         # analysis path
         self.analysis_inception1 = InceptionResBlock(
             in_channels=1, out_channels=int(64 * channel_scale)
         )
+        skip_features_size_stack.insert(0, self.analysis_inception1.out_channels)
+
         self.analysis_downsampling1 = DownsamplingBlock(
             in_channels=int(64 * channel_scale)
         )
         self.analysis_inception2 = InceptionResBlock(
             in_channels=int(64 * channel_scale), out_channels=int(128 * channel_scale)
         )
+        skip_features_size_stack.insert(0, self.analysis_inception2.out_channels)
+
         self.analysis_downsampling2 = DownsamplingBlock(
             in_channels=int(128 * channel_scale)
         )
         self.analysis_inception3 = InceptionResBlock(
             in_channels=int(128 * channel_scale), out_channels=int(256 * channel_scale)
         )
+        skip_features_size_stack.insert(0, self.analysis_inception3.out_channels)
+
         self.analysis_downsampling3 = DownsamplingBlock(
             in_channels=int(256 * channel_scale)
         )
@@ -64,19 +71,25 @@ class DIUNet(nn.Module):
             in_channels=int(512 * channel_scale)
         )
         self.synthesis_inception1 = InceptionResBlock(
-            in_channels=int(512 * channel_scale), out_channels=int(256 * channel_scale)
+            in_channels=int(512 * channel_scale),
+            out_channels=int(256 * channel_scale),
+            skip_feature_size=skip_features_size_stack.pop(0),
         )
         self.synthesis_upsampling3 = UpsamplingBlock(
             in_channels=int(256 * channel_scale)
         )
         self.synthesis_inception2 = InceptionResBlock(
-            in_channels=int(256 * channel_scale), out_channels=int(128 * channel_scale)
+            in_channels=int(256 * channel_scale),
+            out_channels=int(128 * channel_scale),
+            skip_feature_size=skip_features_size_stack.pop(0),
         )
         self.synthesis_upsampling4 = UpsamplingBlock(
             in_channels=int(128 * channel_scale)
         )
         self.synthesis_inception3 = InceptionResBlock(
-            in_channels=int(128 * channel_scale), out_channels=int(64 * channel_scale)
+            in_channels=int(128 * channel_scale),
+            out_channels=int(64 * channel_scale),
+            skip_feature_size=skip_features_size_stack.pop(0),
         )
 
         self.synthesis_inception4 = InceptionResBlock(
@@ -88,12 +101,18 @@ class DIUNet(nn.Module):
         )
 
     def forward(self, x):
+        skip_features = []
+
         # analysis (encoder) path
+        # keep features to send to decoder path
         x = self.analysis_inception1(x)
+        skip_features.insert(0, x)
         x = self.analysis_downsampling1(x)
         x = self.analysis_inception2(x)
+        skip_features.insert(0, x)
         x = self.analysis_downsampling2(x)
         x = self.analysis_inception3(x)
+        skip_features.insert(0, x)
         x = self.analysis_downsampling3(x)
 
         x = self.analysis_denseinception(x)
@@ -107,11 +126,11 @@ class DIUNet(nn.Module):
         x = self.synthesis_denseinception(x)
 
         x = self.synthesis_upsampling2(x)
-        x = self.synthesis_inception1(x)
+        x = self.synthesis_inception1(x, skip_features=skip_features.pop(0))
         x = self.synthesis_upsampling3(x)
-        x = self.synthesis_inception2(x)
+        x = self.synthesis_inception2(x, skip_features=skip_features.pop(0))
         x = self.synthesis_upsampling4(x)
-        x = self.synthesis_inception3(x)
+        x = self.synthesis_inception3(x, skip_features=skip_features.pop(0))
         x = self.synthesis_inception4(x)
 
         return self.synthesis_inception5(x)

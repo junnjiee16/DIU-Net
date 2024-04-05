@@ -3,5 +3,5 @@
 ## TODO
 - Training loop
 - Evaluation metrics
-- Concatenation
+- Concatenation - check if it works
 - Change kernel initializer to he_normal
