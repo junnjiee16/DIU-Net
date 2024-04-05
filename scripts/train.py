@@ -5,7 +5,10 @@
 # For DATASET_DIR, the path starts from project directory
 # Ensure that file names are identical for a pair of image and image mask
 # ---------------------------------------------------------------------
+import json
+from datetime import datetime
 from tqdm import tqdm
+
 import torch
 from torch import nn
 from torch.optim import Adam
@@ -15,24 +18,33 @@ from torchvision.transforms import v2
 from diunet import DIUNet
 from utils import ImageSegmentationDataset
 
+# initialize run name
+RUN_NAME = str(datetime.now().strftime("run_%d-%m-%Y_%H-%M"))
+
 # Check GPU availability
 if torch.cuda.is_available():
     torch.cuda.empty_cache()
     device = torch.device("cuda")
-    print("Info: Using CUDA GPU for training")
+    print(
+        f"Info: CUDA GPU detected, using {torch.cuda.get_device_name(torch.cuda.current_device())} for training"
+    )
 else:
     device = torch.device("cpu")
-    print("Info: CUDA GPU not available, defaulting to CPU for training")
+    print("Info: CUDA GPU not detected, using CPU for training")
 
 # model configuration
-model = DIUNet(channel_scale=0.1, dense_block_depth_scale=0.1)
+MODEL_CHANNEL_SCALE = 0.1
+DENSE_BLOCK_DEPTH_SCALE = 0.1
+model = DIUNet(
+    channel_scale=MODEL_CHANNEL_SCALE, dense_block_depth_scale=DENSE_BLOCK_DEPTH_SCALE
+)
 model.to(device)
-print(f"Info: Model parameter count: {sum(p.numel() for p in model.parameters())}")
+print(f"Info: Model loaded has {sum(p.numel() for p in model.parameters())} parameters")
 
 # training configuration and hyperparameters
 DATASET_DIR = "./data/model_training"
-BATCH_SIZE = 8
 EPOCHS = 3
+BATCH_SIZE = 8
 
 optimizer = Adam(model.parameters(), lr=1e-5, betas=(0.9, 0.999))
 loss_fn = nn.BCEWithLogitsLoss()
@@ -70,6 +82,19 @@ train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True
 val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
 test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE)
 
+# data structure for logging
+log = {
+    "epochs": EPOCHS,
+    "batch_size": BATCH_SIZE,
+    "model_channel_scale": MODEL_CHANNEL_SCALE,
+    "dense_block_depth_scale": DENSE_BLOCK_DEPTH_SCALE,
+    "model_parameters": sum(p.numel() for p in model.parameters()),
+    "train_loss": [],
+    "val_loss": [],
+}
+
+# currently saves best model based on validation BCE loss
+best_val_loss = float("inf")
 
 for epoch in range(EPOCHS):
     # start training loop
@@ -80,7 +105,7 @@ for epoch in range(EPOCHS):
     for train_batch_idx, (train_imgs, train_img_masks) in enumerate(
         pbar := tqdm(train_dataloader)
     ):
-        pbar.set_description(f"Epoch {epoch+1}, Train Loss: {train_running_loss}")
+        pbar.set_description(f"Epoch: {epoch+1}, Train Loss: {train_running_loss}")
 
         train_preds = model(train_imgs)
         loss: torch.Tensor = loss_fn(train_preds, train_img_masks)
@@ -92,6 +117,8 @@ for epoch in range(EPOCHS):
 
         train_loss_sum += loss.item()
         train_running_loss = train_loss_sum / (train_batch_idx + 1)
+
+    log["train_loss"].append(train_running_loss)
 
     # start evaluation loop
     model.eval()
@@ -109,3 +136,13 @@ for epoch in range(EPOCHS):
 
         val_loss_sum += loss.item()
         val_running_loss = val_loss_sum / (val_batch_idx + 1)
+
+    log["val_loss"].append(val_running_loss)
+
+    if val_running_loss < best_val_loss:
+        best_val_loss = val_running_loss
+        torch.save(model.state_dict(), f"./logs/{RUN_NAME}/best_model_state_dict.pt")
+
+# save log
+with open(f"./logs/{RUN_NAME}/results.json", "w") as outfile:
+    json.dump(log, outfile)
