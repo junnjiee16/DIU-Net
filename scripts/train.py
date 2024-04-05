@@ -5,8 +5,9 @@ from diunet import DIUNet
 
 
 model = DIUNet()
-optimizer = Adam(model.parameters(), lr=1e-5)
-epochs = 50
+optimizer = Adam(model.parameters(), lr=1e-5, betas=(0.9, 0.999))
+batch_size = 8
+epochs = 120
 
 for i in range(epochs):
     pass

@@ -1,8 +1,7 @@
 # Dense Inception U-Net
 
 ## TODO
-- Concatenation
-- Compile model
 - Training loop
 - Evaluation metrics
+- Concatenation
 - Change kernel initializer to he_normal
