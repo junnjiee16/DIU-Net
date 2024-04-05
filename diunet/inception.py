@@ -9,13 +9,14 @@ class InceptionResBlock(nn.Module):
     used in the analysis and synthesis path of the U-Net architecture.
     """
 
-    def __init__(self, in_channels: int, out_channels: int):
+    def __init__(self, in_channels: int, out_channels: int, is_output_block=False):
         """
         Parameters:
         - in_channels: number of channels for input data
         - out_channels: desired number of channels for this block to return
         """
         super(InceptionResBlock, self).__init__()
+        self.is_output_block = is_output_block
 
         # layers for 1st branch
         self.branch1_1x1conv = nn.Conv2d(
@@ -82,6 +83,9 @@ class InceptionResBlock(nn.Module):
         x_concat = torch.cat([x1, x2, x3], dim=1)
         x_bottleneck = self.bottleneck_1x1conv(x_concat)
         x_identity = self.downsample(x)
+
+        if self.is_output_block:
+            return F.sigmoid(x_bottleneck + x_identity)
 
         return F.relu(x_bottleneck + x_identity)
 
