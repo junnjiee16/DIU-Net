@@ -25,7 +25,7 @@ else:
     print("Info: CUDA GPU not available, defaulting to CPU for training")
 
 # model configuration
-model = DIUNet(channel_scale=1, dense_block_depth_scale=1)
+model = DIUNet(channel_scale=0.5, dense_block_depth_scale=0.5)
 model.to(device)
 print(f"Info: Model parameter count: {sum(p.numel() for p in model.parameters())}")
 
@@ -83,7 +83,6 @@ for epoch in range(EPOCHS):
         )
     ):
         train_preds = model(train_imgs)
-        print(train_img_masks.shape, train_preds.shape)
         loss: torch.Tensor = loss_fn(train_preds, train_img_masks)
 
         # back propagation

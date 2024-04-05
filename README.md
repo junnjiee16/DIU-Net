@@ -2,6 +2,6 @@
 
 ## TODO
 - Training loop
+    - save best model
 - Evaluation metrics
-- Concatenation - check if it works
 - Change kernel initializer to he_normal

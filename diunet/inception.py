@@ -83,7 +83,7 @@ class InceptionResBlock(nn.Module):
     def forward(self, x, skip_features=None):
         x_start = x
         if self.skip_feature_size:
-            x_start = torch.cat([x_start, skip_features], dim=0)
+            x_start = torch.cat([x_start, skip_features], dim=1)
 
         x1 = self.branch1_1x1conv(x_start)
         x1 = F.relu(self.branch1_bn(x1))
