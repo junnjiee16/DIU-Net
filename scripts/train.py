@@ -6,6 +6,7 @@
 # Ensure that file names are identical for a pair of image and image mask
 # ---------------------------------------------------------------------
 import json
+import os
 from datetime import datetime
 from tqdm import tqdm
 
@@ -20,6 +21,8 @@ from utils import ImageSegmentationDataset
 
 # initialize run name
 RUN_NAME = str(datetime.now().strftime("run_%d-%m-%Y_%H-%M"))
+if not os.path.exists(f"./logs/{RUN_NAME}"):
+    os.makedirs(f"./logs/{RUN_NAME}")
 
 # Check GPU availability
 if torch.cuda.is_available():
