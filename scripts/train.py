@@ -17,6 +17,7 @@ from utils import ImageSegmentationDataset
 
 # Check GPU availability
 if torch.cuda.is_available():
+    torch.cuda.empty_cache()
     device = torch.device("cuda")
     print("Info: Using CUDA GPU for training")
 else:
