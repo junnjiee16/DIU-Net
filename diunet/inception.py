@@ -102,8 +102,8 @@ class InceptionResBlock(nn.Module):
         x_bottleneck = self.bottleneck_1x1conv(x_concat)
         x_identity = self.downsample(x)
 
-        # if self.is_output_block:
-        #     return F.sigmoid(x_bottleneck + x_identity)
+        if self.is_output_block:
+            return x_bottleneck + x_identity
 
         return F.relu(x_bottleneck + x_identity)
 

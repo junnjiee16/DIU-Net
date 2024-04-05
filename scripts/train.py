@@ -5,9 +5,6 @@
 # For DATASET_DIR, the path starts from project directory
 # Ensure that file names are identical for a pair of image and image mask
 # ---------------------------------------------------------------------
-import json
-import os
-from datetime import datetime
 from tqdm import tqdm
 
 import torch
@@ -17,12 +14,15 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import v2
 
 from diunet import DIUNet
-from utils import ImageSegmentationDataset
+from utils import ImageSegmentationDataset, EarlyStopper, Logger
 
-# initialize run name
-RUN_NAME = str(datetime.now().strftime("run_%d-%m-%Y_%H-%M"))
-if not os.path.exists(f"./logs/{RUN_NAME}"):
-    os.makedirs(f"./logs/{RUN_NAME}")
+
+PARAMS = {
+    "max_epochs": 3,
+    "batch_size": 8,
+    "model_channel_scale": 0.25,
+    "dense_block_depth_scale": 0.25,
+}
 
 # Check GPU availability
 if torch.cuda.is_available():
@@ -36,21 +36,21 @@ else:
     print("Info: CUDA GPU not detected, using CPU for training")
 
 # model configuration
-MODEL_CHANNEL_SCALE = 0.1
-DENSE_BLOCK_DEPTH_SCALE = 0.1
 model = DIUNet(
-    channel_scale=MODEL_CHANNEL_SCALE, dense_block_depth_scale=DENSE_BLOCK_DEPTH_SCALE
+    channel_scale=PARAMS["model_channel_scale"],
+    dense_block_depth_scale=PARAMS["dense_block_depth_scale"],
 )
 model.to(device)
 print(f"Info: Model loaded has {sum(p.numel() for p in model.parameters())} parameters")
 
 # training configuration and hyperparameters
 DATASET_DIR = "./data/model_training"
-EPOCHS = 3
-BATCH_SIZE = 8
-
 optimizer = Adam(model.parameters(), lr=1e-5, betas=(0.9, 0.999))
 loss_fn = nn.BCEWithLogitsLoss()
+
+# ---------------------------------------------
+# Dataset preparation
+# ---------------------------------------------
 
 # transformation for images
 transforms = v2.Compose(
@@ -81,25 +81,24 @@ test_dataset = ImageSegmentationDataset(
 )
 
 # create dataloader
-train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
-test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE)
+train_dataloader = DataLoader(
+    train_dataset, batch_size=PARAMS["batch_size"], shuffle=True
+)
+val_dataloader = DataLoader(val_dataset, batch_size=PARAMS["batch_size"])
+test_dataloader = DataLoader(test_dataset, batch_size=PARAMS["batch_size"])
 
-# data structure for logging
-log = {
-    "epochs": EPOCHS,
-    "batch_size": BATCH_SIZE,
-    "model_channel_scale": MODEL_CHANNEL_SCALE,
-    "dense_block_depth_scale": DENSE_BLOCK_DEPTH_SCALE,
-    "model_parameters": sum(p.numel() for p in model.parameters()),
-    "train_loss": [],
-    "val_loss": [],
-}
+# ---------------------------------------------
+# Model training
+# ---------------------------------------------
+
+logger = Logger(PARAMS)
+early_stopper = EarlyStopper(patience=10, min_delta=0.03)
+
 
 # currently saves best model based on validation BCE loss
 best_val_loss = float("inf")
 
-for epoch in range(EPOCHS):
+for epoch in range(PARAMS["max_epochs"]):
     # start training loop
     model.train()
     train_loss_sum = 0
@@ -121,8 +120,6 @@ for epoch in range(EPOCHS):
         train_loss_sum += loss.item()
         train_running_loss = train_loss_sum / (train_batch_idx + 1)
 
-    log["train_loss"].append(train_running_loss)
-
     # start evaluation loop
     model.eval()
     val_loss_sum = 0
@@ -140,12 +137,21 @@ for epoch in range(EPOCHS):
         val_loss_sum += loss.item()
         val_running_loss = val_loss_sum / (val_batch_idx + 1)
 
-    log["val_loss"].append(val_running_loss)
+    # log results
+    logger.train_loss.append(train_running_loss)
+    logger.val_loss.append(val_running_loss)
 
+    # save best model
     if val_running_loss < best_val_loss:
         best_val_loss = val_running_loss
-        torch.save(model.state_dict(), f"./logs/{RUN_NAME}/best_model_state_dict.pt")
+        torch.save(
+            model.state_dict(), f"./logs/{logger.run_name}/best_model_state_dict.pt"
+        )
+
+    # early stopping
+    if early_stopper.early_stop(val_running_loss):
+        break
 
 # save log
-with open(f"./logs/{RUN_NAME}/results.json", "w") as outfile:
-    json.dump(log, outfile)
+logger.epochs_trained = epoch + 1
+logger.save_run()
