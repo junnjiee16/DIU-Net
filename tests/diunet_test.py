@@ -1,14 +1,16 @@
-import torch
 from diunet import DIUNet
-torch.cuda.empty_cache()
+from torchview import draw_graph
 
-model = DIUNet(out_channels=2, scale = 0.25)
-print(f"CUDA: {torch.cuda.is_available()}")
-print(
-    f"Trainable parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}"
+model = DIUNet(0.25, 0.25)
+architecture = "DIU-Net"
+model_graph = draw_graph(
+    model,
+    input_size=(1, 1, 512, 512),
+    graph_dir="TB",
+    roll=True,
+    expand_nested=True,
+    graph_name=f"self_{architecture}",
+    save_graph=True,
+    directory="assets/self",
+    filename=f"self_{architecture}",
 )
-
-test_data = torch.randn((1, 1, 512, 512))
-with torch.no_grad():
-    x = model(test_data)
-    print(x.shape)
