@@ -42,7 +42,7 @@ model = DIUNet(
 )
 model.to(device)
 PARAMS["parameter_count"] = sum(p.numel() for p in model.parameters())
-print(f"Info: Model loaded has {PARAMS["parameter_count"]} parameters")
+print(f"Info: Model loaded has {PARAMS['parameter_count']} parameters")
 
 # training configuration and hyperparameters
 DATASET_DIR = "./data/model_training"
