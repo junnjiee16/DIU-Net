@@ -41,7 +41,8 @@ model = DIUNet(
     dense_block_depth_scale=PARAMS["dense_block_depth_scale"],
 )
 model.to(device)
-print(f"Info: Model loaded has {sum(p.numel() for p in model.parameters())} parameters")
+PARAMS["parameter_count"] = sum(p.numel() for p in model.parameters())
+print(f"Info: Model loaded has {PARAMS["parameter_count"]} parameters")
 
 # training configuration and hyperparameters
 DATASET_DIR = "./data/model_training"
@@ -92,7 +93,7 @@ test_dataloader = DataLoader(test_dataset, batch_size=PARAMS["batch_size"])
 # ---------------------------------------------
 
 logger = Logger(PARAMS)
-early_stopper = EarlyStopper(patience=10, min_delta=0.03)
+early_stopper = EarlyStopper(patience=10)
 
 
 # currently saves best model based on validation BCE loss
