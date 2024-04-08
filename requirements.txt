@@ -1,4 +1,6 @@
 numpy
 torch
 torchvision
+torchmetrics
+torchview
 tqdm
