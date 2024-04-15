@@ -1,5 +1,6 @@
 # ---------------------------------------------------------------------
-# To run this script, call `python -m scripts.train` in the terminal
+# To run this script, run `python -m scripts.train`
+# To monitor Tensorboard, run `tensorboard serve --logdir runs/`
 #
 # Notes:
 # For DATASET_DIR, the path starts from project directory
@@ -176,8 +177,8 @@ for epoch in range(PARAMS["max_epochs"]):
     logger.train_loss.append(metrics["train_running_loss"])
     logger.val_loss.append(metrics["val_running_loss"])
 
-    writer.add_scalar("Loss/train", metrics["train_running_loss"], epoch)
-    writer.add_scalar("Loss/val", metrics["val_running_loss"], epoch)
+    writer.add_scalar("loss/train", metrics["train_running_loss"], epoch)
+    writer.add_scalar("loss/val", metrics["val_running_loss"], epoch)
     writer.add_scalar("mIoU/train", metrics["train_running_iou"], epoch)
     writer.add_scalar("mIoU/val", metrics["val_running_iou"], epoch)
 
