@@ -1,13 +1,11 @@
 # Dense Inception U-Net
 
 ## TODO
-- Split data manually
-
+- integrate mIoU into training loop
 - setup tensorboard for logging
 
 - Training loop
     - add time to train log
-    - he_normal initialization for kernels
 
 - Evaluation metrics
     - DICE

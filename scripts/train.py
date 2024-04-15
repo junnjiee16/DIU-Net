@@ -8,15 +8,21 @@
 from tqdm import tqdm
 
 import torch
+import torch.nn.functional as F
 from torch import nn
 from torch.optim import Adam
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
+
 from torchvision.transforms import v2
+from torchmetrics.classification import BinaryJaccardIndex
 
 from diunet import DIUNet
 from utils import ImageSegmentationDataset, EarlyStopper, Logger
 
-
+# ---------------------------------------------
+# Training preparation
+# ---------------------------------------------
 PARAMS = {
     "max_epochs": 3,
     "batch_size": 8,
@@ -93,23 +99,33 @@ test_dataloader = DataLoader(test_dataset, batch_size=PARAMS["batch_size"])
 # ---------------------------------------------
 
 logger = Logger(PARAMS)
+writer = SummaryWriter()
 early_stopper = EarlyStopper(patience=10)
+iou_metric = BinaryJaccardIndex()
 
 
 # currently saves best model based on validation BCE loss
 best_val_loss = float("inf")
 
 for epoch in range(PARAMS["max_epochs"]):
+    # reset metrics
+    metrics = {
+        "train_loss_sum": 0,
+        "train_running_loss": 0,
+        "train_iou_sum": 0,
+        "train_running_iou": 0,
+        "val_loss_sum": 0,
+        "val_running_loss": 0,
+        "val_iou_sum": 0,
+        "val_running_iou": 0,
+    }
+
     # start training loop
     model.train()
-    train_loss_sum = 0
-    train_running_loss = 0
 
     for train_batch_idx, (train_imgs, train_img_masks) in enumerate(
         pbar := tqdm(train_dataloader)
     ):
-        pbar.set_description(f"Epoch: {epoch+1}, Train Loss: {train_running_loss}")
-
         train_preds = model(train_imgs)
         loss: torch.Tensor = loss_fn(train_preds, train_img_masks)
 
@@ -118,41 +134,56 @@ for epoch in range(PARAMS["max_epochs"]):
         optimizer.step()
         optimizer.zero_grad()
 
-        train_loss_sum += loss.item()
-        train_running_loss = train_loss_sum / (train_batch_idx + 1)
+        # calculate metrics
+        metrics["train_loss_sum"] += loss.item()
+        metrics["train_running_loss"] = metrics["train_loss_sum"] / (train_batch_idx + 1)
+
+        metrics["train_iou_sum"] = iou_metric(torch.round(F.sigmoid(train_preds)), train_img_masks)
+        metrics["train_running_iou"] = metrics["train_iou_sum"] / (train_batch_idx + 1)
+
+        pbar.set_description(f"Epoch: {epoch+1}, Train Loss: {metrics["train_running_loss"]}, Train mIoU: {metrics["train_running_iou"]}")
 
     # start evaluation loop
     model.eval()
-    val_loss_sum = 0
-    val_running_loss = 0
 
     for val_batch_idx, (val_imgs, val_img_masks) in enumerate(
         pbar := tqdm(val_dataloader)
     ):
-        pbar.set_description(f"Epoch: {epoch+1}, Val Loss: {val_running_loss}")
-
         with torch.no_grad():
             val_preds = model(val_imgs)
             loss = loss_fn(val_preds, val_img_masks)
 
-        val_loss_sum += loss.item()
-        val_running_loss = val_loss_sum / (val_batch_idx + 1)
+        # calculate metrics
+        metrics["val_loss_sum"] += loss.item()
+        metrics["val_running_loss"] = metrics["val_loss_sum"] / (val_batch_idx + 1)
+        metrics["val_iou_sum"] = iou_metric(torch.round(F.sigmoid(val_preds)), val_img_masks)
+        metrics["val_running_iou"] = metrics["val_iou_sum"] / (val_batch_idx + 1)
+
+        pbar.set_description(f"Epoch: {epoch+1}, Val Loss: {metrics["val_running_loss"]}, Val mIoU: {metrics["val_running_iou"]}")
 
     # log results
-    logger.train_loss.append(train_running_loss)
-    logger.val_loss.append(val_running_loss)
+    logger.train_loss.append(metrics["train_running_loss"])
+    logger.val_loss.append(metrics["val_running_loss"])
+
+    writer.add_scalar("Loss/train", metrics["train_running_loss"], epoch)
+    writer.add_scalar("Loss/val", metrics["val_running_loss"], epoch)
+    writer.add_scalar("mIoU/train", metrics["train_running_iou"], epoch)
+    writer.add_scalar("mIoU/val", metrics["val_running_iou"], epoch)
 
     # save best model
-    if val_running_loss < best_val_loss:
-        best_val_loss = val_running_loss
+    if metrics["val_running_loss"] < best_val_loss:
+        best_val_loss = metrics["val_running_loss"]
         torch.save(
             model.state_dict(), f"./logs/{logger.run_name}/best_model_state_dict.pt"
         )
 
     # early stopping
-    if early_stopper.early_stop(val_running_loss):
+    if early_stopper.early_stop(metrics["val_running_loss"]):
         break
 
 # save log
 logger.epochs_trained = epoch + 1
 logger.save_run()
+
+writer.flush()
+writer.close()
