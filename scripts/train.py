@@ -55,6 +55,7 @@ DATASET_DIR = "./data/model_training"
 early_stopper = EarlyStopper(patience=10)
 optimizer = Adam(model.parameters(), lr=1e-5, betas=(0.9, 0.999))
 loss_fn = nn.BCEWithLogitsLoss()
+iou_metric = BinaryJaccardIndex().to(device)
 
 # ---------------------------------------------
 # Dataset preparation
@@ -101,7 +102,6 @@ test_dataloader = DataLoader(test_dataset, batch_size=PARAMS["batch_size"])
 
 logger = Logger(PARAMS)
 writer = SummaryWriter()
-iou_metric = BinaryJaccardIndex()
 
 
 # currently saves best model based on validation BCE loss
