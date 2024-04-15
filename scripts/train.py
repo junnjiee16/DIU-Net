@@ -25,7 +25,7 @@ from utils import ImageSegmentationDataset, EarlyStopper, Logger
 # Training preparation
 # ---------------------------------------------
 PARAMS = {
-    "max_epochs": 3,
+    "max_epochs": 100,
     "batch_size": 8,
     "model_channel_scale": 0.25,
     "dense_block_depth_scale": 0.25,
