@@ -140,7 +140,7 @@ for epoch in range(PARAMS["max_epochs"]):
             train_batch_idx + 1
         )
 
-        metrics["train_iou_sum"] = iou_metric(
+        metrics["train_iou_sum"] += iou_metric(
             torch.round(F.sigmoid(train_preds)), train_img_masks
         )
         metrics["train_running_iou"] = metrics["train_iou_sum"] / (train_batch_idx + 1)
@@ -162,7 +162,8 @@ for epoch in range(PARAMS["max_epochs"]):
         # calculate metrics
         metrics["val_loss_sum"] += loss.item()
         metrics["val_running_loss"] = metrics["val_loss_sum"] / (val_batch_idx + 1)
-        metrics["val_iou_sum"] = iou_metric(
+
+        metrics["val_iou_sum"] += iou_metric(
             torch.round(F.sigmoid(val_preds)), val_img_masks
         )
         metrics["val_running_iou"] = metrics["val_iou_sum"] / (val_batch_idx + 1)
