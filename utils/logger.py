@@ -10,6 +10,7 @@ class Logger:
         self.train_loss = []
         self.val_loss = []
         self.epochs_trained = 0
+        self.best_epoch = 0
 
         # immediately create folder on intialization
         if not os.path.exists(f"./logs/{self.run_name}"):

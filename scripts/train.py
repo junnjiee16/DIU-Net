@@ -185,6 +185,7 @@ for epoch in range(PARAMS["max_epochs"]):
     # save best model
     if metrics["val_running_loss"] < best_val_loss:
         best_val_loss = metrics["val_running_loss"]
+        logger.best_epoch = epoch + 1
         torch.save(
             model.state_dict(), f"./logs/{logger.run_name}/best_model_state_dict.pt"
         )
