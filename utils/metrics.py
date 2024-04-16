@@ -23,7 +23,7 @@ def __calc_binary_miou(preds, targets):
 
 
 def binary_miou(preds_batch, targets_batch):
-    assert preds_batch == targets_batch
+    assert preds_batch.shape == targets_batch.shape
 
     iou_sum = 0
     for pred, target in zip(preds_batch, targets_batch):
