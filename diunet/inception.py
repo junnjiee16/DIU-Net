@@ -103,7 +103,7 @@ class InceptionResBlock(nn.Module):
         x_identity = self.downsample(x)
 
         if self.is_output_block:
-            return x_bottleneck + x_identity
+            return F.sigmoid(x_bottleneck + x_identity)
 
         return F.relu(x_bottleneck + x_identity)
 

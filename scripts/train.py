@@ -16,10 +16,9 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from torchvision.transforms import v2
-from torchmetrics.classification import BinaryJaccardIndex
 
 from diunet import DIUNet
-from utils import ImageSegmentationDataset, EarlyStopper, Logger
+from utils import ImageSegmentationDataset, EarlyStopper, Logger, binary_miou
 
 # ---------------------------------------------
 # Training preparation
@@ -55,8 +54,7 @@ print(f"Info: Model loaded has {PARAMS['parameter_count']} parameters")
 DATASET_DIR = "./data/model_training"
 early_stopper = EarlyStopper(patience=10)
 optimizer = Adam(model.parameters(), lr=1e-5, betas=(0.9, 0.999))
-loss_fn = nn.BCEWithLogitsLoss()
-iou_metric = BinaryJaccardIndex().to(device)
+loss_fn = nn.BCELoss()
 
 # ---------------------------------------------
 # Dataset preparation
@@ -95,7 +93,7 @@ train_dataloader = DataLoader(
     train_dataset, batch_size=PARAMS["batch_size"], shuffle=True
 )
 val_dataloader = DataLoader(val_dataset, batch_size=PARAMS["batch_size"])
-test_dataloader = DataLoader(test_dataset, batch_size=PARAMS["batch_size"])
+test_dataloader = DataLoader(test_dataset, batch_size=1)
 
 # ---------------------------------------------
 # Model training
@@ -141,8 +139,8 @@ for epoch in range(PARAMS["max_epochs"]):
             train_batch_idx + 1
         )
 
-        metrics["train_iou_sum"] += iou_metric(
-            torch.round(F.sigmoid(train_preds)), train_img_masks
+        metrics["train_iou_sum"] += binary_miou(
+            torch.round(train_preds), train_img_masks
         )
         metrics["train_running_iou"] = metrics["train_iou_sum"] / (train_batch_idx + 1)
 
@@ -164,9 +162,7 @@ for epoch in range(PARAMS["max_epochs"]):
         metrics["val_loss_sum"] += loss.item()
         metrics["val_running_loss"] = metrics["val_loss_sum"] / (val_batch_idx + 1)
 
-        metrics["val_iou_sum"] += iou_metric(
-            torch.round(F.sigmoid(val_preds)), val_img_masks
-        )
+        metrics["val_iou_sum"] += binary_miou(torch.round(val_preds), val_img_masks)
         metrics["val_running_iou"] = metrics["val_iou_sum"] / (val_batch_idx + 1)
 
         pbar.set_description(
@@ -194,9 +190,22 @@ for epoch in range(PARAMS["max_epochs"]):
     if early_stopper.early_stop(metrics["val_running_loss"]):
         break
 
-# save log
 logger.epochs_trained = epoch + 1
-logger.save_run()
 
 writer.flush()
 writer.close()
+
+# ---------------------------------------------
+# Evaluate model on test set
+# ---------------------------------------------
+model.eval()
+
+test_miou_sum = 0
+for test_batch_idx, (test_imgs, test_img_masks) in enumerate(test_dataloader):
+    test_preds = model(test_imgs)
+    test_miou_sum += binary_miou(test_preds, test_img_masks)
+
+logger.test_miou = test_miou_sum / (test_batch_idx + 1)
+
+# save log
+logger.save_run()

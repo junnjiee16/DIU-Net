@@ -11,6 +11,7 @@ class Logger:
         self.val_loss = []
         self.epochs_trained = 0
         self.best_epoch = 0
+        self.test_miou = 0
 
         # immediately create folder on intialization
         if not os.path.exists(f"./logs/{self.run_name}"):
@@ -20,6 +21,8 @@ class Logger:
         self.metadata["train_loss"] = self.train_loss
         self.metadata["val_loss"] = self.val_loss
         self.metadata["epochs_trained"] = self.epochs_trained
+        self.metadata["best_epoch"] = self.best_epoch
+        self.metadata["test_miou"] = self.test_miou
 
         with open(f"./logs/{self.run_name}/results.json", "w") as outfile:
             json.dump(self.metadata, outfile)

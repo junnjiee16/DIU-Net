@@ -96,7 +96,7 @@ class DIUNet(nn.Module):
             in_channels=int(64 * channel_scale), out_channels=int(32 * channel_scale)
         )
         # final output block
-        self.synthesis_inception5 = InceptionResBlock(
+        self.synthesis_inception_output = InceptionResBlock(
             in_channels=int(32 * channel_scale), out_channels=1, is_output_block=True
         )
 
@@ -133,4 +133,4 @@ class DIUNet(nn.Module):
         x = self.synthesis_inception3(x, skip_features=skip_features.pop(0))
         x = self.synthesis_inception4(x)
 
-        return self.synthesis_inception5(x)
+        return self.synthesis_inception_output(x)
