@@ -4,12 +4,12 @@ from torchmetrics.classification import BinaryJaccardIndex
 
 
 class BinaryMIOU:
-    def __init__(self, threshold=0.5):
+    def __init__(self, threshold=0.5, device=torch.device("cpu")):
         """
         If input are floats [0, 1], it will be set to 0s and 1s based on threshold.
         """
         self.threshold = threshold
-        self.jaccard = BinaryJaccardIndex()
+        self.jaccard = BinaryJaccardIndex().to(device)
 
     def __call__(self, pred, real):
         assert pred.shape == real.shape

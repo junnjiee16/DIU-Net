@@ -56,7 +56,7 @@ print(f"Info: Model loaded has {PARAMS['parameter_count']} parameters")
 early_stopper = EarlyStopper(patience=PARAMS["patience"])
 optimizer = Adam(model.parameters(), lr=PARAMS["learning_rate"], betas=(0.9, 0.999))
 loss_fn = nn.BCELoss()
-miou_metric = BinaryMIOU()
+miou_metric = BinaryMIOU(device=device)
 
 # ---------------------------------------------
 # Dataset preparation
