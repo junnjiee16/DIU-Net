@@ -9,7 +9,6 @@
 from tqdm import tqdm
 
 import torch
-import torch.nn.functional as F
 from torch import nn
 from torch.optim import Adam
 from torch.utils.data import DataLoader
@@ -18,14 +17,17 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms import v2
 
 from diunet import DIUNet
-from utils import ImageSegmentationDataset, EarlyStopper, Logger, binary_miou
+from utils import ImageSegmentationDataset, EarlyStopper, Logger, BinaryMIOU
 
 # ---------------------------------------------
 # Training preparation
 # ---------------------------------------------
+DATASET_DIR = "./data/model_training"
 PARAMS = {
-    "max_epochs": 100,
+    "max_epochs": 1000,
     "batch_size": 8,
+    "learning_rate": 2e-6,
+    "patience": 20,
     "model_channel_scale": 0.25,
     "dense_block_depth_scale": 0.25,
 }
@@ -51,10 +53,10 @@ PARAMS["parameter_count"] = sum(p.numel() for p in model.parameters())
 print(f"Info: Model loaded has {PARAMS['parameter_count']} parameters")
 
 # training configuration and hyperparameters
-DATASET_DIR = "./data/model_training"
-early_stopper = EarlyStopper(patience=10)
-optimizer = Adam(model.parameters(), lr=1e-5, betas=(0.9, 0.999))
+early_stopper = EarlyStopper(patience=PARAMS["patience"])
+optimizer = Adam(model.parameters(), lr=PARAMS["learning_rate"], betas=(0.9, 0.999))
 loss_fn = nn.BCELoss()
+miou_metric = BinaryMIOU()
 
 # ---------------------------------------------
 # Dataset preparation
@@ -98,10 +100,8 @@ test_dataloader = DataLoader(test_dataset, batch_size=1)
 # ---------------------------------------------
 # Model training
 # ---------------------------------------------
-
 logger = Logger(PARAMS)
 writer = SummaryWriter()
-
 
 # currently saves best model based on validation BCE loss
 best_val_loss = float("inf")
@@ -139,9 +139,7 @@ for epoch in range(PARAMS["max_epochs"]):
             train_batch_idx + 1
         )
 
-        metrics["train_iou_sum"] += binary_miou(
-            torch.round(train_preds), train_img_masks
-        )
+        metrics["train_iou_sum"] += miou_metric(train_preds, train_img_masks)
         metrics["train_running_iou"] = metrics["train_iou_sum"] / (train_batch_idx + 1)
 
         pbar.set_description(
@@ -162,7 +160,7 @@ for epoch in range(PARAMS["max_epochs"]):
         metrics["val_loss_sum"] += loss.item()
         metrics["val_running_loss"] = metrics["val_loss_sum"] / (val_batch_idx + 1)
 
-        metrics["val_iou_sum"] += binary_miou(torch.round(val_preds), val_img_masks)
+        metrics["val_iou_sum"] += miou_metric(val_preds, val_img_masks)
         metrics["val_running_iou"] = metrics["val_iou_sum"] / (val_batch_idx + 1)
 
         pbar.set_description(
@@ -170,9 +168,6 @@ for epoch in range(PARAMS["max_epochs"]):
         )
 
     # log results
-    logger.train_loss.append(metrics["train_running_loss"])
-    logger.val_loss.append(metrics["val_running_loss"])
-
     writer.add_scalar("loss/train", metrics["train_running_loss"], epoch)
     writer.add_scalar("loss/val", metrics["val_running_loss"], epoch)
     writer.add_scalar("mIoU/train", metrics["train_running_iou"], epoch)
@@ -190,8 +185,6 @@ for epoch in range(PARAMS["max_epochs"]):
     if early_stopper.early_stop(metrics["val_running_loss"]):
         break
 
-logger.epochs_trained = epoch + 1
-
 writer.flush()
 writer.close()
 
@@ -203,9 +196,9 @@ model.eval()
 test_miou_sum = 0
 for test_batch_idx, (test_imgs, test_img_masks) in enumerate(test_dataloader):
     test_preds = model(test_imgs)
-    test_miou_sum += binary_miou(test_preds, test_img_masks)
+    test_miou_sum += miou_metric(test_preds, test_img_masks)
 
+# save final log
+logger.epochs_trained = epoch + 1
 logger.test_miou = test_miou_sum / (test_batch_idx + 1)
-
-# save log
 logger.save_run()

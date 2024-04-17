@@ -1,32 +1,38 @@
+import numpy as np
 import torch
+from torchmetrics.classification import BinaryJaccardIndex
 
 
-def __calc_iou(bool_preds, bool_targets):
-    intersection = torch.logical_and(bool_preds, bool_targets).sum().item()
-    union = torch.logical_or(bool_preds, bool_targets).sum().item()
+class BinaryMIOU:
+    def __init__(self, threshold=0.5):
+        """
+        If input are floats [0, 1], it will be set to 0s and 1s based on threshold.
+        """
+        self.threshold = threshold
+        self.jaccard = BinaryJaccardIndex()
 
-    if union == 0:
-        return 0
-    return intersection / union
+    def __call__(self, pred, real):
+        assert pred.shape == real.shape
 
+        # flatten arrays into 1st dimension, keep the 0th dimension
+        int_pred = torch.where(
+            pred > self.threshold, torch.tensor(1), torch.tensor(0)
+        ).flatten(1)
+        int_real = torch.where(
+            real > self.threshold, torch.tensor(1), torch.tensor(0)
+        ).flatten(1)
 
-def __calc_binary_miou(preds, targets):
-    bool_preds1 = preds == 0
-    bool_targets1 = targets == 0
+        # iterate through all predictions
+        results = np.empty((int_pred.shape[0]))
 
-    bool_preds2 = preds == 0
-    bool_targets2 = targets == 0
+        for i in range(len(results)):
+            background_iou = self.jaccard(int_pred[i], int_real[i])
 
-    return (
-        __calc_iou(bool_preds1, bool_targets1) + __calc_iou(bool_preds2, bool_targets2)
-    ) / 2
+            # Assumes background is white (1) and target is black (0)
+            flip_int_pred = int_pred[i] == 0
+            flip_int_real = int_real[i] == 0
+            target_iou = self.jaccard(flip_int_pred, flip_int_real)
 
+            results[i] = float((background_iou + target_iou) / 2)
 
-def binary_miou(preds_batch, targets_batch):
-    assert preds_batch.shape == targets_batch.shape
-
-    iou_sum = 0
-    for pred, target in zip(preds_batch, targets_batch):
-        iou_sum += __calc_binary_miou(pred, target)
-
-    return iou_sum / preds_batch.shape[0]
+        return np.average(results)
