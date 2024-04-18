@@ -45,7 +45,10 @@ else:
     print("Info: CUDA GPU not detected, using CPU for training")
 
 # model configuration
-model = deeplabv3_resnet50(num_classes=2)
+model = deeplabv3_resnet50(num_classes=1)
+model.backbone.conv1 = nn.Conv2d(
+    1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False
+)
 model.to(device)
 PARAMS["parameter_count"] = sum(p.numel() for p in model.parameters())
 print(f"Info: Model loaded has {PARAMS['parameter_count']} parameters")
@@ -93,7 +96,7 @@ train_dataloader = DataLoader(
     train_dataset, batch_size=PARAMS["batch_size"], shuffle=True
 )
 val_dataloader = DataLoader(val_dataset, batch_size=PARAMS["batch_size"])
-test_dataloader = DataLoader(test_dataset, batch_size=1)
+test_dataloader = DataLoader(test_dataset, batch_size=PARAMS["batch_size"])
 
 # ---------------------------------------------
 # Model training
@@ -123,7 +126,7 @@ for epoch in range(PARAMS["max_epochs"]):
     for train_batch_idx, (train_imgs, train_img_masks) in enumerate(
         pbar := tqdm(train_dataloader)
     ):
-        train_preds = model(train_imgs)
+        train_preds = model(train_imgs)["out"]
         loss: torch.Tensor = loss_fn(train_preds, train_img_masks)
 
         # back propagation
@@ -151,7 +154,7 @@ for epoch in range(PARAMS["max_epochs"]):
         pbar := tqdm(val_dataloader)
     ):
         with torch.no_grad():
-            val_preds = model(val_imgs)
+            val_preds = model(val_imgs)["out"]
             loss = loss_fn(val_preds, val_img_masks)
 
         # calculate metrics
@@ -193,7 +196,7 @@ model.eval()
 
 test_miou_sum = 0
 for test_batch_idx, (test_imgs, test_img_masks) in enumerate(test_dataloader):
-    test_preds = model(test_imgs)
+    test_preds = model(test_imgs)["out"]
     test_miou_sum += miou_metric(test_preds, test_img_masks)
 
 # save final log
