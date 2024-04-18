@@ -15,8 +15,8 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from torchvision.transforms import v2
+from torchvision.models.segmentation import deeplabv3_resnet50
 
-from diunet import DIUNet
 from utils import ImageSegmentationDataset, EarlyStopper, Logger, BinaryMIOU
 
 # ---------------------------------------------
@@ -24,7 +24,7 @@ from utils import ImageSegmentationDataset, EarlyStopper, Logger, BinaryMIOU
 # ---------------------------------------------
 DATASET_DIR = "./data/model_training"
 PARAMS = {
-    "description": "DIU-Net trained on original data",
+    "description": "DeepLabV3 trained on original data",
     "max_epochs": 1000,
     "batch_size": 8,
     "learning_rate": 2e-6,
@@ -45,10 +45,7 @@ else:
     print("Info: CUDA GPU not detected, using CPU for training")
 
 # model configuration
-model = DIUNet(
-    channel_scale=PARAMS["model_channel_scale"],
-    dense_block_depth_scale=PARAMS["dense_block_depth_scale"],
-)
+model = deeplabv3_resnet50(num_classes=2)
 model.to(device)
 PARAMS["parameter_count"] = sum(p.numel() for p in model.parameters())
 print(f"Info: Model loaded has {PARAMS['parameter_count']} parameters")
