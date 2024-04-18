@@ -9,6 +9,7 @@
 from tqdm import tqdm
 
 import torch
+import torch.nn.functional as F
 from torch import nn
 from torch.optim import Adam
 from torch.utils.data import DataLoader
@@ -126,7 +127,7 @@ for epoch in range(PARAMS["max_epochs"]):
     for train_batch_idx, (train_imgs, train_img_masks) in enumerate(
         pbar := tqdm(train_dataloader)
     ):
-        train_preds = model(train_imgs)["out"]
+        train_preds = F.sigmoid(model(train_imgs)["out"])
         loss: torch.Tensor = loss_fn(train_preds, train_img_masks)
 
         # back propagation
@@ -154,7 +155,7 @@ for epoch in range(PARAMS["max_epochs"]):
         pbar := tqdm(val_dataloader)
     ):
         with torch.no_grad():
-            val_preds = model(val_imgs)["out"]
+            val_preds = F.sigmoid(model(val_imgs)["out"])
             loss = loss_fn(val_preds, val_img_masks)
 
         # calculate metrics
@@ -196,7 +197,7 @@ model.eval()
 
 test_miou_sum = 0
 for test_batch_idx, (test_imgs, test_img_masks) in enumerate(test_dataloader):
-    test_preds = model(test_imgs)["out"]
+    test_preds = F.sigmoid(model(test_imgs)["out"])
     test_miou_sum += miou_metric(test_preds, test_img_masks)
 
 # save final log
