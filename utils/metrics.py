@@ -14,6 +14,7 @@ class BinaryMIOU:
     def __call__(self, pred, real):
         assert pred.shape == real.shape
 
+        # convert image into 0s and 1s only using simple threshold
         # flatten arrays into 1st dimension, keep the 0th dimension
         int_pred = torch.where(
             pred > self.threshold, torch.tensor(1), torch.tensor(0)
