@@ -84,19 +84,12 @@ val_dataset = ImageSegmentationDataset(
     transforms,
     transforms,
 )
-test_dataset = ImageSegmentationDataset(
-    f"{DATASET_DIR}/test/images",
-    f"{DATASET_DIR}/test/image_masks",
-    transforms,
-    transforms,
-)
 
 # create dataloader
 train_dataloader = DataLoader(
     train_dataset, batch_size=PARAMS["batch_size"], shuffle=True
 )
 val_dataloader = DataLoader(val_dataset, batch_size=PARAMS["batch_size"])
-test_dataloader = DataLoader(test_dataset, batch_size=1)
 
 # ---------------------------------------------
 # Model training
@@ -186,14 +179,9 @@ for epoch in range(PARAMS["max_epochs"]):
     if early_stopper.early_stop(metrics["val_running_loss"]):
         break
 
+# save final log
 writer.flush()
 writer.close()
 
-# ---------------------------------------------
-# Evaluate model on test set
-# ---------------------------------------------
-model.eval()
-
-# save final log
 PARAMS["epochs_trained"] = epoch + 1
-logger.save_run()
+logger.save_run(PARAMS)
