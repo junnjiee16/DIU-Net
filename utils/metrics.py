@@ -27,6 +27,9 @@ class BinaryMIOU:
         results = np.empty((int_pred.shape[0]))
 
         for i in range(len(results)):
+            # torchmetrics jaccard index function only calculates iou of
+            # the truth labels (1s), hence labels need to be flipped
+            # so that iou for both classes can be calculated respectively
             background_iou = self.jaccard(int_pred[i], int_real[i])
 
             # Assumes background is white (1) and target is black (0)

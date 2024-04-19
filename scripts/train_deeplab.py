@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------
-# To run this script, run `python -m scripts.train`
+# To run this script, run `python -m scripts.train_deeplab`
 # To monitor Tensorboard, run `tensorboard serve --logdir runs/`
 #
 # Notes:
