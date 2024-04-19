@@ -71,7 +71,7 @@ transforms = v2.Compose(
     ]
 )
 
-# create dataset
+# create datasets
 train_dataset = ImageSegmentationDataset(
     f"{DATASET_DIR}/train/images",
     f"{DATASET_DIR}/train/image_masks",
@@ -101,7 +101,7 @@ test_dataloader = DataLoader(test_dataset, batch_size=1)
 # ---------------------------------------------
 # Model training
 # ---------------------------------------------
-logger = Logger(PARAMS)
+logger = Logger()
 writer = SummaryWriter()
 
 # currently saves best model based on validation BCE loss
@@ -177,7 +177,7 @@ for epoch in range(PARAMS["max_epochs"]):
     # save best model
     if metrics["val_running_loss"] < best_val_loss:
         best_val_loss = metrics["val_running_loss"]
-        logger.best_epoch = epoch + 1
+        PARAMS["best_epoch"] = epoch + 1
         torch.save(
             model.state_dict(), f"./logs/{logger.run_name}/best_model_state_dict.pt"
         )
@@ -194,12 +194,6 @@ writer.close()
 # ---------------------------------------------
 model.eval()
 
-test_miou_sum = 0
-for test_batch_idx, (test_imgs, test_img_masks) in enumerate(test_dataloader):
-    test_preds = model(test_imgs)
-    test_miou_sum += miou_metric(test_preds, test_img_masks)
-
 # save final log
-logger.epochs_trained = epoch + 1
-logger.test_miou = test_miou_sum / (test_batch_idx + 1)
+PARAMS["epochs_trained"] = epoch + 1
 logger.save_run()

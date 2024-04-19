@@ -30,8 +30,6 @@ PARAMS = {
     "batch_size": 8,
     "learning_rate": 2e-6,
     "patience": 20,
-    "model_channel_scale": 0.25,
-    "dense_block_depth_scale": 0.25,
 }
 
 # Check GPU availability
@@ -50,6 +48,8 @@ model = deeplabv3_resnet50(num_classes=1)
 model.backbone.conv1 = nn.Conv2d(
     1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False
 )
+model.classifier.add_module("output", nn.Sigmoid())
+
 model.to(device)
 PARAMS["parameter_count"] = sum(p.numel() for p in model.parameters())
 print(f"Info: Model loaded has {PARAMS['parameter_count']} parameters")
@@ -102,7 +102,7 @@ test_dataloader = DataLoader(test_dataset, batch_size=PARAMS["batch_size"])
 # ---------------------------------------------
 # Model training
 # ---------------------------------------------
-logger = Logger(PARAMS)
+logger = Logger()
 writer = SummaryWriter()
 
 # currently saves best model based on validation BCE loss
@@ -127,7 +127,7 @@ for epoch in range(PARAMS["max_epochs"]):
     for train_batch_idx, (train_imgs, train_img_masks) in enumerate(
         pbar := tqdm(train_dataloader)
     ):
-        train_preds = F.sigmoid(model(train_imgs)["out"])
+        train_preds = model(train_imgs)["out"]
         loss: torch.Tensor = loss_fn(train_preds, train_img_masks)
 
         # back propagation
@@ -155,7 +155,7 @@ for epoch in range(PARAMS["max_epochs"]):
         pbar := tqdm(val_dataloader)
     ):
         with torch.no_grad():
-            val_preds = F.sigmoid(model(val_imgs)["out"])
+            val_preds = model(val_imgs)["out"]
             loss = loss_fn(val_preds, val_img_masks)
 
         # calculate metrics
@@ -178,7 +178,7 @@ for epoch in range(PARAMS["max_epochs"]):
     # save best model
     if metrics["val_running_loss"] < best_val_loss:
         best_val_loss = metrics["val_running_loss"]
-        logger.best_epoch = epoch + 1
+        PARAMS["best_epoch"] = epoch + 1
         torch.save(
             model.state_dict(), f"./logs/{logger.run_name}/best_model_state_dict.pt"
         )
@@ -195,12 +195,6 @@ writer.close()
 # ---------------------------------------------
 model.eval()
 
-test_miou_sum = 0
-for test_batch_idx, (test_imgs, test_img_masks) in enumerate(test_dataloader):
-    test_preds = F.sigmoid(model(test_imgs)["out"])
-    test_miou_sum += miou_metric(test_preds, test_img_masks)
-
 # save final log
-logger.epochs_trained = epoch + 1
-logger.test_miou = test_miou_sum / (test_batch_idx + 1)
-logger.save_run()
+PARAMS["epochs_trained"] = epoch + 1
+logger.save_run(PARAMS)
