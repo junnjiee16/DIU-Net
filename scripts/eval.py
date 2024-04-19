@@ -11,9 +11,11 @@ import cv2
 from tqdm import tqdm
 
 import torch
+from torch import nn
 from torch.utils.data import DataLoader
 
 from torchvision.transforms import v2
+from torchvision.models.segmentation import deeplabv3_resnet50
 
 from diunet import DIUNet
 from utils import ImageSegmentationDataset, BinaryMIOU
@@ -25,6 +27,13 @@ from utils import ImageSegmentationDataset, BinaryMIOU
 MODEL_PATH = "./logs/run_17-04-2024_15-51/best_model_state_dict.pt"
 DATASET_DIR = "./data"
 model = DIUNet(channel_scale=0.25, dense_block_depth_scale=0.25)
+
+model = deeplabv3_resnet50(num_classes=1)
+model.backbone.conv1 = nn.Conv2d(
+    1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False
+)
+model.classifier.add_module("output", nn.Sigmoid())
+
 
 # check GPU availability
 if torch.cuda.is_available():
@@ -95,7 +104,8 @@ miou_metric = BinaryMIOU(device=device)
 miou_sum = 0
 for idx, (imgs, masks) in enumerate(tqdm(test_dataloader, desc="Test set")):
     with torch.no_grad():
-        preds = model(imgs)
+        # preds = model(imgs)
+        preds = model(imgs)["out"]
         miou_sum += miou_metric(preds, masks)
 
 print(f"Normal test set mIoU: {miou_sum / (idx + 1)}")
@@ -106,7 +116,8 @@ for idx, (imgs, masks) in enumerate(
     tqdm(rotated_test_dataloader, desc="Rotated test set")
 ):
     with torch.no_grad():
-        preds = model(imgs)
+        # preds = model(imgs)
+        preds = model(imgs)["out"]
         rotated_miou_sum += miou_metric(preds, masks)
 
 print(f"Rotated test set mIoU: {rotated_miou_sum / (idx + 1)}")
@@ -131,7 +142,8 @@ for ksize in ksize_mious.keys():
         tqdm(blurred_dataloader, desc=f"Blurred test set (ksize {ksize})")
     ):
         with torch.no_grad():
-            preds = model(imgs)
+            # preds = model(imgs)
+            preds = model(imgs)["out"]
             miou_sum += miou_metric(preds, masks)
 
     ksize_mious[ksize] = miou_sum / (idx + 1)
