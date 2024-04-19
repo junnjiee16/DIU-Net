@@ -126,6 +126,7 @@ for ksize in ksize_mious.keys():
     )
     blurred_dataloader = DataLoader(blurred_dataset, batch_size=1)
 
+    # iterate through dataloader
     for idx, (imgs, masks) in enumerate(
         tqdm(blurred_dataloader, desc=f"Blurred test set (ksize {ksize})")
     ):
