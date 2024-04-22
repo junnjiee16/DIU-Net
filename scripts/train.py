@@ -27,7 +27,7 @@ PARAMS = {
     "description": "DIU-Net trained on original data",
     "max_epochs": 120,
     "batch_size": 8,
-    "learning_rate": 2e-6,
+    "learning_rate": 1e-5,
     "model_channel_scale": 0.5,
     "dense_block_depth_scale": 0.25,
 }
