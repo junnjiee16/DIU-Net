@@ -25,11 +25,10 @@ from utils import ImageSegmentationDataset, EarlyStopper, Logger, BinaryMIOU
 DATASET_DIR = "./data/model_training"
 PARAMS = {
     "description": "DIU-Net trained on original data",
-    "max_epochs": 1000,
+    "max_epochs": 120,
     "batch_size": 8,
     "learning_rate": 2e-6,
-    "patience": 20,
-    "model_channel_scale": 0.25,
+    "model_channel_scale": 0.5,
     "dense_block_depth_scale": 0.25,
 }
 
@@ -54,7 +53,7 @@ PARAMS["parameter_count"] = sum(p.numel() for p in model.parameters())
 print(f"Info: Model loaded has {PARAMS['parameter_count']} parameters")
 
 # training configuration and hyperparameters
-early_stopper = EarlyStopper(patience=PARAMS["patience"])
+# early_stopper = EarlyStopper(patience=PARAMS["patience"])
 optimizer = Adam(model.parameters(), lr=PARAMS["learning_rate"], betas=(0.9, 0.999))
 loss_fn = nn.BCELoss()
 miou_metric = BinaryMIOU(device=device)
@@ -96,9 +95,7 @@ val_dataloader = DataLoader(val_dataset, batch_size=PARAMS["batch_size"])
 # ---------------------------------------------
 logger = Logger()
 writer = SummaryWriter()
-
-# currently saves best model based on validation BCE loss
-best_val_loss = float("inf")
+best_val_miou = float("-inf")
 
 for epoch in range(PARAMS["max_epochs"]):
     # reset metrics
@@ -168,16 +165,16 @@ for epoch in range(PARAMS["max_epochs"]):
     writer.add_scalar("mIoU/val", metrics["val_running_iou"], epoch)
 
     # save best model
-    if metrics["val_running_loss"] < best_val_loss:
-        best_val_loss = metrics["val_running_loss"]
+    if metrics["val_running_miou"] > best_val_miou:
+        best_val_miou = metrics["val_running_miou"]
         PARAMS["best_epoch"] = epoch + 1
         torch.save(
             model.state_dict(), f"./logs/{logger.run_name}/best_model_state_dict.pt"
         )
 
     # early stopping
-    if early_stopper.early_stop(metrics["val_running_loss"]):
-        break
+    # if early_stopper.early_stop(metrics["val_running_loss"]):
+    #     break
 
 # save final log
 writer.flush()
