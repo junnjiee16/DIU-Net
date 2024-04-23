@@ -26,7 +26,7 @@ DATASET_DIR = "./data/model_training"
 PARAMS = {
     "description": "DIU-Net trained on original data",
     "max_epochs": 120,
-    "batch_size": 8,
+    "batch_size": 6,
     "learning_rate": 1e-5,
     "model_channel_scale": 0.5,
     "dense_block_depth_scale": 0.25,
@@ -66,7 +66,7 @@ miou_metric = BinaryMIOU(device=device)
 transforms = v2.Compose(
     [
         v2.ToDtype(torch.float32, scale=True),
-        v2.Lambda(lambda x: x.to(device)),
+        # v2.Lambda(lambda x: x.to(device)),
     ]
 )
 
@@ -116,6 +116,9 @@ for epoch in range(PARAMS["max_epochs"]):
     for train_batch_idx, (train_imgs, train_img_masks) in enumerate(
         pbar := tqdm(train_dataloader)
     ):
+        train_imgs = train_imgs.to(device)
+        train_imgs_masks = train_imgs_masks.to(device)
+
         train_preds = model(train_imgs)
         loss: torch.Tensor = loss_fn(train_preds, train_img_masks)
 
@@ -143,6 +146,9 @@ for epoch in range(PARAMS["max_epochs"]):
     for val_batch_idx, (val_imgs, val_img_masks) in enumerate(
         pbar := tqdm(val_dataloader)
     ):
+        val_imgs = val_imgs.to(device)
+        val_imgs_masks = val_imgs_masks.to(device)
+
         with torch.no_grad():
             val_preds = model(val_imgs)
             loss = loss_fn(val_preds, val_img_masks)
@@ -165,8 +171,8 @@ for epoch in range(PARAMS["max_epochs"]):
     writer.add_scalar("mIoU/val", metrics["val_running_iou"], epoch)
 
     # save best model
-    if metrics["val_running_miou"] > best_val_miou:
-        best_val_miou = metrics["val_running_miou"]
+    if metrics["val_running_iou"] > best_val_miou:
+        best_val_miou = metrics["val_running_iou"]
         PARAMS["best_epoch"] = epoch + 1
         torch.save(
             model.state_dict(), f"./logs/{logger.run_name}/best_model_state_dict.pt"
