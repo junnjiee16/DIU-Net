@@ -176,7 +176,7 @@ for epoch in range(PARAMS["max_epochs"]):
     writer.add_scalar("loss/val", metrics["val_running_loss"], epoch + 1)
     writer.add_scalar("mIoU/train", metrics["train_running_iou"], epoch + 1)
     writer.add_scalar("mIoU/val", metrics["val_running_iou"], epoch + 1)
-    writer.add_scalar("learning_rate", scheduler.get_last_lr(), epoch + 1)
+    writer.add_scalar("learning_rate", optimizer.param_groups[0]["lr"], epoch + 1)
 
     # log loss to learning rate scheduler
     scheduler.step(val_loss)
