@@ -105,7 +105,7 @@ logger = Logger()
 writer = SummaryWriter()
 loss_fn = nn.BCELoss()
 optimizer = Adam(model.parameters(), lr=PARAMS["learning_rate"], betas=(0.9, 0.999))
-scheduler = ReduceLROnPlateau(patience=10)
+scheduler = ReduceLROnPlateau(optimizer, patience=10)
 
 miou_metric = BinaryMIOU(device=device)
 best_miou_loss = float("-inf")
