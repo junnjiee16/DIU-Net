@@ -20,13 +20,14 @@ from torchvision.models.segmentation import deeplabv3_resnet50
 
 from utils import ImageSegmentationDataset, Logger, BinaryMIOU
 from diunet.inception import InceptionResBlock
+from diunet.dense_inception import DenseInceptionBlock
 
 # ---------------------------------------------
 # Training preparation
 # ---------------------------------------------
 DATASET_DIR = "./data/model_training"
 PARAMS = {
-    "description": "DeepLabV3 trained on original data",
+    "description": "Dense Inception DeepLabV3",
     "max_epochs": 120,
     "batch_size": 8,
     "learning_rate": 5e-6,
@@ -55,7 +56,8 @@ model.classifier[0].add_module(
     InceptionResBlock(in_channels=256, out_channels=256),
 )
 model.classifier[3] = nn.Sequential(
-    nn.ReLU(), InceptionResBlock(in_channels=256, out_channels=256)
+    nn.ReLU(),
+    DenseInceptionBlock(in_channels=256, out_channels=256, depth=4),
 )
 model.classifier.add_module("output", nn.Sigmoid())
 
@@ -128,15 +130,15 @@ for epoch in range(PARAMS["max_epochs"]):
         pbar := tqdm(train_dataloader)
     ):
         train_preds = model(train_imgs)["out"]
-        loss: torch.Tensor = loss_fn(train_preds, train_img_masks)
+        train_loss: torch.Tensor = loss_fn(train_preds, train_img_masks)
 
         # back propagation
-        loss.backward()
+        train_loss.backward()
         optimizer.step()
         optimizer.zero_grad()
 
         # calculate metrics
-        metrics["train_loss_sum"] += loss.item()
+        metrics["train_loss_sum"] += train_loss.item()
         metrics["train_running_loss"] = metrics["train_loss_sum"] / (
             train_batch_idx + 1
         )
@@ -156,12 +158,10 @@ for epoch in range(PARAMS["max_epochs"]):
     ):
         with torch.no_grad():
             val_preds = model(val_imgs)["out"]
-            loss = loss_fn(val_preds, val_img_masks)
-
-        scheduler.step(loss)
+            val_loss: torch.Tensor = loss_fn(val_preds, val_img_masks)
 
         # calculate metrics
-        metrics["val_loss_sum"] += loss.item()
+        metrics["val_loss_sum"] += val_loss.item()
         metrics["val_running_loss"] = metrics["val_loss_sum"] / (val_batch_idx + 1)
 
         metrics["val_iou_sum"] += miou_metric(val_preds, val_img_masks)
@@ -176,6 +176,10 @@ for epoch in range(PARAMS["max_epochs"]):
     writer.add_scalar("loss/val", metrics["val_running_loss"], epoch + 1)
     writer.add_scalar("mIoU/train", metrics["train_running_iou"], epoch + 1)
     writer.add_scalar("mIoU/val", metrics["val_running_iou"], epoch + 1)
+    writer.add_scalar("learning_rate", scheduler.get_last_lr(), epoch + 1)
+
+    # log loss to learning rate scheduler
+    scheduler.step(val_loss)
 
     # save best model
     if metrics["val_running_iou"] > best_miou_loss:
