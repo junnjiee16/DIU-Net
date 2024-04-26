@@ -11,6 +11,7 @@ from tqdm import tqdm
 import torch
 from torch import nn
 from torch.optim import Adam
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
@@ -63,11 +64,6 @@ model.to(device)
 PARAMS["parameter_count"] = sum(p.numel() for p in model.parameters())
 print(f"Info: Model loaded has {PARAMS['parameter_count']} parameters")
 
-# training configuration and hyperparameters
-optimizer = Adam(model.parameters(), lr=PARAMS["learning_rate"], betas=(0.9, 0.999))
-loss_fn = nn.BCELoss()
-miou_metric = BinaryMIOU(device=device)
-
 # ---------------------------------------------
 # Dataset preparation
 # ---------------------------------------------
@@ -105,6 +101,11 @@ val_dataloader = DataLoader(val_dataset, batch_size=PARAMS["batch_size"])
 # ---------------------------------------------
 logger = Logger()
 writer = SummaryWriter()
+loss_fn = nn.BCELoss()
+optimizer = Adam(model.parameters(), lr=PARAMS["learning_rate"], betas=(0.9, 0.999))
+scheduler = ReduceLROnPlateau(patience=10)
+
+miou_metric = BinaryMIOU(device=device)
 best_miou_loss = float("-inf")
 
 for epoch in range(PARAMS["max_epochs"]):
@@ -156,6 +157,8 @@ for epoch in range(PARAMS["max_epochs"]):
         with torch.no_grad():
             val_preds = model(val_imgs)["out"]
             loss = loss_fn(val_preds, val_img_masks)
+
+        scheduler.step(loss)
 
         # calculate metrics
         metrics["val_loss_sum"] += loss.item()
