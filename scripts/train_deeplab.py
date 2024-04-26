@@ -9,7 +9,6 @@
 from tqdm import tqdm
 
 import torch
-import torch.nn.functional as F
 from torch import nn
 from torch.optim import Adam
 from torch.utils.data import DataLoader
@@ -18,7 +17,8 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms import v2
 from torchvision.models.segmentation import deeplabv3_resnet50
 
-from utils import ImageSegmentationDataset, EarlyStopper, Logger, BinaryMIOU
+from utils import ImageSegmentationDataset, Logger, BinaryMIOU
+from diunet.inception import InceptionResBlock
 
 # ---------------------------------------------
 # Training preparation
@@ -26,10 +26,9 @@ from utils import ImageSegmentationDataset, EarlyStopper, Logger, BinaryMIOU
 DATASET_DIR = "./data/model_training"
 PARAMS = {
     "description": "DeepLabV3 trained on original data",
-    "max_epochs": 1000,
+    "max_epochs": 120,
     "batch_size": 8,
-    "learning_rate": 2e-6,
-    "patience": 20,
+    "learning_rate": 5e-6,
 }
 
 # Check GPU availability
@@ -45,17 +44,26 @@ else:
 
 # model configuration
 model = deeplabv3_resnet50(num_classes=1)
+
+# modifying model layers
 model.backbone.conv1 = nn.Conv2d(
     1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False
 )
+model.classifier[0].add_module(
+    "InceptionResBlock",
+    InceptionResBlock(in_channels=256, out_channels=256),
+)
+model.classifier[3] = nn.Sequential(
+    nn.ReLU(), InceptionResBlock(in_channels=256, out_channels=256)
+)
 model.classifier.add_module("output", nn.Sigmoid())
 
+# put model on device
 model.to(device)
 PARAMS["parameter_count"] = sum(p.numel() for p in model.parameters())
 print(f"Info: Model loaded has {PARAMS['parameter_count']} parameters")
 
 # training configuration and hyperparameters
-early_stopper = EarlyStopper(patience=PARAMS["patience"])
 optimizer = Adam(model.parameters(), lr=PARAMS["learning_rate"], betas=(0.9, 0.999))
 loss_fn = nn.BCELoss()
 miou_metric = BinaryMIOU(device=device)
@@ -97,9 +105,7 @@ val_dataloader = DataLoader(val_dataset, batch_size=PARAMS["batch_size"])
 # ---------------------------------------------
 logger = Logger()
 writer = SummaryWriter()
-
-# currently saves best model based on validation BCE loss
-best_val_loss = float("inf")
+best_miou_loss = float("-inf")
 
 for epoch in range(PARAMS["max_epochs"]):
     # reset metrics
@@ -163,22 +169,18 @@ for epoch in range(PARAMS["max_epochs"]):
         )
 
     # log results
-    writer.add_scalar("loss/train", metrics["train_running_loss"], epoch)
-    writer.add_scalar("loss/val", metrics["val_running_loss"], epoch)
-    writer.add_scalar("mIoU/train", metrics["train_running_iou"], epoch)
-    writer.add_scalar("mIoU/val", metrics["val_running_iou"], epoch)
+    writer.add_scalar("loss/train", metrics["train_running_loss"], epoch + 1)
+    writer.add_scalar("loss/val", metrics["val_running_loss"], epoch + 1)
+    writer.add_scalar("mIoU/train", metrics["train_running_iou"], epoch + 1)
+    writer.add_scalar("mIoU/val", metrics["val_running_iou"], epoch + 1)
 
     # save best model
-    if metrics["val_running_loss"] < best_val_loss:
-        best_val_loss = metrics["val_running_loss"]
+    if metrics["val_running_iou"] > best_miou_loss:
+        best_miou_loss = metrics["val_running_iou"]
         PARAMS["best_epoch"] = epoch + 1
         torch.save(
             model.state_dict(), f"./logs/{logger.run_name}/best_model_state_dict.pt"
         )
-
-    # early stopping
-    if early_stopper.early_stop(metrics["val_running_loss"]):
-        break
 
 # save final log
 writer.flush()
