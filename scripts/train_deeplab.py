@@ -16,21 +16,21 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from torchvision.transforms import v2
-from torchvision.models.segmentation import deeplabv3_resnet50
 
 from utils import ImageSegmentationDataset, Logger, BinaryMIOU
-from diunet.inception import InceptionResBlock
-from diunet.dense_inception import DenseInceptionBlock
+from deeplab import inception_deeplabv3
 
 # ---------------------------------------------
 # Training preparation
 # ---------------------------------------------
 DATASET_DIR = "./data/model_training"
 PARAMS = {
-    "description": "Dense Inception DeepLabV3",
+    "description": "Inception DeepLabV3",
     "max_epochs": 120,
     "batch_size": 8,
     "learning_rate": 5e-6,
+    "backbone": "resnet50",
+    "inception_modules": 1,
 }
 
 # Check GPU availability
@@ -45,21 +45,9 @@ else:
     print("Info: CUDA GPU not detected, using CPU for training")
 
 # model configuration
-model = deeplabv3_resnet50(num_classes=1)
-
-# modifying model layers
-model.backbone.conv1 = nn.Conv2d(
-    1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False
+model = inception_deeplabv3(
+    backbone=PARAMS["backbone"], inception_module_count=PARAMS["inception_modules"]
 )
-model.classifier[0].add_module(
-    "InceptionResBlock",
-    InceptionResBlock(in_channels=256, out_channels=256),
-)
-model.classifier[3] = nn.Sequential(
-    nn.ReLU(),
-    DenseInceptionBlock(in_channels=256, out_channels=256, depth=4),
-)
-model.classifier.add_module("output", nn.Sigmoid())
 
 # put model on device
 model.to(device)
