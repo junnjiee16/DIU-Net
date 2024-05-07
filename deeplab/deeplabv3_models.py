@@ -23,14 +23,13 @@ def deeplabv3_modded(backbone="resnet50"):
 def inception_deeplabv3(backbone="resnet50", inception_module_count=1):
     model = deeplabv3_modded(backbone)
 
-    # remove original classification head and add custom inception modules
-    del model.classifier[1:3]
-
+    # add inception modules after ASPP block
     inception_modules = nn.Sequential(
         *[
             InceptionResBlock(in_channels=256, out_channels=256)
             for _ in range(inception_module_count)
-        ]
+        ],
+        model.classifier[1]
     )
     model.classifier[1] = inception_modules
 
