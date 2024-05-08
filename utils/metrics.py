@@ -3,6 +3,37 @@ import torch
 from torchmetrics.classification import BinaryJaccardIndex
 
 
+class ModifiedBinaryJaccardIndex:
+    def __init__(self, class_id=0, threshold=0.5, device=torch.device("cpu")):
+        self.threshold = threshold
+        self.class_id = class_id
+        self.jaccard = BinaryJaccardIndex().to(device)
+
+    def __call__(self, pred, real):
+        assert pred.shape == real.shape
+
+        # convert image into 0s and 1s only using simple threshold
+        # flatten arrays into 1st dimension, keep the 0th dimension
+        int_pred = torch.where(
+            pred > self.threshold, torch.tensor(1), torch.tensor(0)
+        ).flatten(1)
+        int_real = torch.where(
+            real > self.threshold, torch.tensor(1), torch.tensor(0)
+        ).flatten(1)
+
+        # iterate through all predictions
+        results = np.empty((int_pred.shape[0]))
+
+        for i in range(len(results)):
+            # torchmetrics jaccard index function only calculates iou of
+            # the truth labels
+            bool_pred = int_pred[i] == self.class_id
+            bool_real = int_real[i] == self.class_id
+            results[i] = self.jaccard(bool_pred, bool_real)
+
+        return np.average(results)
+
+
 class BinaryMIOU:
     def __init__(self, threshold=0.5, device=torch.device("cpu")):
         """

@@ -17,7 +17,12 @@ from torch.utils.tensorboard import SummaryWriter
 
 from torchvision.transforms import v2
 
-from utils import ImageSegmentationDataset, Logger, BinaryMIOU
+from utils import (
+    ImageSegmentationDataset,
+    Logger,
+    BinaryMIOU,
+    ModifiedBinaryJaccardIndex,
+)
 from deeplab import inception_deeplabv3
 
 # ---------------------------------------------
@@ -25,7 +30,7 @@ from deeplab import inception_deeplabv3
 # ---------------------------------------------
 DATASET_DIR = "./data/model_training"
 PARAMS = {
-    "description": "Inception DeepLabV3",
+    "description": "1module-inception-deeplabv3",
     "max_epochs": 120,
     "batch_size": 8,
     "learning_rate": 5e-6,
@@ -68,14 +73,14 @@ transforms = v2.Compose(
 
 # create dataset
 train_dataset = ImageSegmentationDataset(
-    f"{DATASET_DIR}/train/images",
-    f"{DATASET_DIR}/train/image_masks",
+    f"{DATASET_DIR}/train_augmented/images",
+    f"{DATASET_DIR}/train_augmented/image_masks",
     transforms,
     transforms,
 )
 val_dataset = ImageSegmentationDataset(
-    f"{DATASET_DIR}/val/images",
-    f"{DATASET_DIR}/val/image_masks",
+    f"{DATASET_DIR}/val_augmented/images",
+    f"{DATASET_DIR}/val_augmented/image_masks",
     transforms,
     transforms,
 )
@@ -89,26 +94,34 @@ val_dataloader = DataLoader(val_dataset, batch_size=PARAMS["batch_size"])
 # ---------------------------------------------
 # Model training
 # ---------------------------------------------
-logger = Logger()
-writer = SummaryWriter()
+writer = SummaryWriter(comment=f"_{PARAMS['description']}")
+logger = Logger(logdir=f"./{writer.get_logdir()}")
+
 loss_fn = nn.BCELoss()
 optimizer = Adam(model.parameters(), lr=PARAMS["learning_rate"], betas=(0.9, 0.999))
 scheduler = ReduceLROnPlateau(optimizer, patience=10)
 
+# class 0 for black (color of defect in mask)
+jaccard_index = ModifiedBinaryJaccardIndex(class_id=0, device=device)
 miou_metric = BinaryMIOU(device=device)
-best_miou_loss = float("-inf")
+best_miou = float("-inf")
 
 for epoch in range(PARAMS["max_epochs"]):
-    # reset metrics
     metrics = {
+        # train metrics
         "train_loss_sum": 0,
         "train_running_loss": 0,
-        "train_iou_sum": 0,
-        "train_running_iou": 0,
+        "train_miou_sum": 0,
+        "train_running_miou": 0,
+        "train_defect_iou_sum": 0,
+        "train_running_defect_iou": 0,
+        # val metrics
         "val_loss_sum": 0,
         "val_running_loss": 0,
-        "val_iou_sum": 0,
-        "val_running_iou": 0,
+        "val_miou_sum": 0,
+        "val_running_miou": 0,
+        "val_defect_iou_sum": 0,
+        "val_running_defect_iou": 0,
     }
 
     # start training loop
@@ -131,11 +144,20 @@ for epoch in range(PARAMS["max_epochs"]):
             train_batch_idx + 1
         )
 
-        metrics["train_iou_sum"] += miou_metric(train_preds, train_img_masks)
-        metrics["train_running_iou"] = metrics["train_iou_sum"] / (train_batch_idx + 1)
+        metrics["train_miou_sum"] += miou_metric(train_preds, train_img_masks)
+        metrics["train_running_miou"] = metrics["train_miou_sum"] / (
+            train_batch_idx + 1
+        )
+
+        metrics["train_defect_iou_sum"] += jaccard_index(train_preds, train_img_masks)
+        metrics["train_running_defect_miou"] = metrics["train_defect_iou_sum"] / (
+            train_batch_idx + 1
+        )
 
         pbar.set_description(
-            f"Epoch: {epoch+1}, Train Loss: {metrics['train_running_loss']}, Train mIoU: {metrics['train_running_iou']}"
+            f"Epoch: {epoch+1}, Train Loss: {metrics['train_running_loss']}"
+            + f", Train mIoU: {metrics['train_running_miou']}"
+            + f", Train Defect IoU: {metrics['train_running_defect_iou']}"
         )
 
     # start evaluation loop
@@ -152,29 +174,43 @@ for epoch in range(PARAMS["max_epochs"]):
         metrics["val_loss_sum"] += val_loss.item()
         metrics["val_running_loss"] = metrics["val_loss_sum"] / (val_batch_idx + 1)
 
-        metrics["val_iou_sum"] += miou_metric(val_preds, val_img_masks)
-        metrics["val_running_iou"] = metrics["val_iou_sum"] / (val_batch_idx + 1)
+        metrics["val_miou_sum"] += miou_metric(val_preds, val_img_masks)
+        metrics["val_running_miou"] = metrics["val_miou_sum"] / (val_batch_idx + 1)
+
+        metrics["val_defect_iou_sum"] += jaccard_index(val_preds, val_img_masks)
+        metrics["val_running_defect_miou"] = metrics["val_defect_iou_sum"] / (
+            val_batch_idx + 1
+        )
 
         pbar.set_description(
-            f"Epoch: {epoch+1}, Val Loss: {metrics['val_running_loss']}, Val mIoU: {metrics['val_running_iou']}"
+            f"Epoch: {epoch+1}, Val Loss: {metrics['val_running_loss']}"
+            + f", Val mIoU: {metrics['val_running_miou']}"
+            + f", Val Defect IoU: {metrics['val_running_defect_iou']}"
         )
 
     # log results
     writer.add_scalar("loss/train", metrics["train_running_loss"], epoch + 1)
     writer.add_scalar("loss/val", metrics["val_running_loss"], epoch + 1)
-    writer.add_scalar("mIoU/train", metrics["train_running_iou"], epoch + 1)
-    writer.add_scalar("mIoU/val", metrics["val_running_iou"], epoch + 1)
+
+    writer.add_scalar("mIoU/train", metrics["train_running_miou"], epoch + 1)
+    writer.add_scalar("mIoU/val", metrics["val_running_miou"], epoch + 1)
+
+    writer.add_scalar(
+        "defect IoU/train", metrics["train_running_defect_iou"], epoch + 1
+    )
+    writer.add_scalar("defect IoU/val", metrics["val_running_defect_iou"], epoch + 1)
+
     writer.add_scalar("learning_rate", optimizer.param_groups[0]["lr"], epoch + 1)
 
     # log loss to learning rate scheduler
     scheduler.step(val_loss)
 
     # save best model
-    if metrics["val_running_iou"] > best_miou_loss:
-        best_miou_loss = metrics["val_running_iou"]
+    if metrics["val_running_miou"] > best_miou:
+        best_miou = metrics["val_running_miou"]
         PARAMS["best_epoch"] = epoch + 1
         torch.save(
-            model.state_dict(), f"./logs/{logger.run_name}/best_model_state_dict.pt"
+            model.state_dict(), f"./logs/{logger.logdir}/best_model_state_dict.pt"
         )
 
 # save final log
