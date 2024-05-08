@@ -29,7 +29,8 @@ class ModifiedBinaryJaccardIndex:
             # the truth labels
             bool_pred = int_pred[i] == self.class_id
             bool_real = int_real[i] == self.class_id
-            results[i] = float(self.jaccard(bool_pred, bool_real))
+            iou = np.float32(self.jaccard(bool_pred, bool_real))
+            results[i] = iou if iou != np.nan else 0
 
         return np.average(results)
 
@@ -68,6 +69,7 @@ class BinaryMIOU:
             flip_int_real = int_real[i] == 0
             target_iou = self.jaccard(flip_int_pred, flip_int_real)
 
-            results[i] = float((background_iou + target_iou) / 2)
+            miou = np.float32((background_iou + target_iou) / 2)
+            results[i] = miou if miou != np.nan else 0
 
         return np.average(results)
