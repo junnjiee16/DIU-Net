@@ -17,12 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from torchvision.transforms import v2
 
-from utils import (
-    ImageSegmentationDataset,
-    Logger,
-    BinaryMIOU,
-    ModifiedBinaryJaccardIndex,
-)
+from utils import ImageSegmentationDataset, Logger, BinaryMIOU
 from deeplab import inception_deeplabv3
 
 # ---------------------------------------------
@@ -101,8 +96,6 @@ loss_fn = nn.BCELoss()
 optimizer = Adam(model.parameters(), lr=PARAMS["learning_rate"], betas=(0.9, 0.999))
 scheduler = ReduceLROnPlateau(optimizer, patience=10)
 
-# class 0 for black (color of defect in mask)
-jaccard_index = ModifiedBinaryJaccardIndex(class_id=0, device=device)
 miou_metric = BinaryMIOU(device=device)
 best_miou = float("-inf")
 
@@ -113,15 +106,11 @@ for epoch in range(PARAMS["max_epochs"]):
         "train_running_loss": 0,
         "train_miou_sum": 0,
         "train_running_miou": 0,
-        "train_defect_iou_sum": 0,
-        "train_running_defect_iou": 0,
         # val metrics
         "val_loss_sum": 0,
         "val_running_loss": 0,
         "val_miou_sum": 0,
         "val_running_miou": 0,
-        "val_defect_iou_sum": 0,
-        "val_running_defect_iou": 0,
     }
 
     # start training loop
@@ -149,15 +138,9 @@ for epoch in range(PARAMS["max_epochs"]):
             train_batch_idx + 1
         )
 
-        metrics["train_defect_iou_sum"] += jaccard_index(train_preds, train_img_masks)
-        metrics["train_running_defect_miou"] = metrics["train_defect_iou_sum"] / (
-            train_batch_idx + 1
-        )
-
         pbar.set_description(
             f"Epoch: {epoch+1}, Train Loss: {metrics['train_running_loss']}"
             + f", Train mIoU: {metrics['train_running_miou']}"
-            + f", Train Defect IoU: {metrics['train_running_defect_iou']}"
         )
 
     # start evaluation loop
@@ -177,15 +160,9 @@ for epoch in range(PARAMS["max_epochs"]):
         metrics["val_miou_sum"] += miou_metric(val_preds, val_img_masks)
         metrics["val_running_miou"] = metrics["val_miou_sum"] / (val_batch_idx + 1)
 
-        metrics["val_defect_iou_sum"] += jaccard_index(val_preds, val_img_masks)
-        metrics["val_running_defect_miou"] = metrics["val_defect_iou_sum"] / (
-            val_batch_idx + 1
-        )
-
         pbar.set_description(
             f"Epoch: {epoch+1}, Val Loss: {metrics['val_running_loss']}"
             + f", Val mIoU: {metrics['val_running_miou']}"
-            + f", Val Defect IoU: {metrics['val_running_defect_iou']}"
         )
 
     # log results
@@ -194,11 +171,6 @@ for epoch in range(PARAMS["max_epochs"]):
 
     writer.add_scalar("mIoU/train", metrics["train_running_miou"], epoch + 1)
     writer.add_scalar("mIoU/val", metrics["val_running_miou"], epoch + 1)
-
-    writer.add_scalar(
-        "defect IoU/train", metrics["train_running_defect_iou"], epoch + 1
-    )
-    writer.add_scalar("defect IoU/val", metrics["val_running_defect_iou"], epoch + 1)
 
     writer.add_scalar("learning_rate", optimizer.param_groups[0]["lr"], epoch + 1)
 
