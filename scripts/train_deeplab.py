@@ -209,9 +209,7 @@ for epoch in range(PARAMS["max_epochs"]):
     if metrics["val_running_miou"] > best_miou:
         best_miou = metrics["val_running_miou"]
         PARAMS["best_epoch"] = epoch + 1
-        torch.save(
-            model.state_dict(), f"./logs/{logger.logdir}/best_model_state_dict.pt"
-        )
+        torch.save(model.state_dict(), f"{logger.logdir}/best_model_state_dict.pt")
 
 # save final log
 writer.flush()
