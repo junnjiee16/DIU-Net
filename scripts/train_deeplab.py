@@ -31,9 +31,9 @@ from deeplab import inception_deeplabv3
 DATASET_DIR = "./data/model_training"
 PARAMS = {
     "description": "1module-inception-deeplabv3",
-    "max_epochs": 120,
+    "max_epochs": 50,
     "batch_size": 8,
-    "learning_rate": 5e-6,
+    "learning_rate": 1e-5,
     "backbone": "resnet50",
     "inception_modules": 1,
 }

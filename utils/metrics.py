@@ -29,7 +29,7 @@ class ModifiedBinaryJaccardIndex:
             # the truth labels
             bool_pred = int_pred[i] == self.class_id
             bool_real = int_real[i] == self.class_id
-            results[i] = self.jaccard(bool_pred, bool_real)
+            results[i] = float(self.jaccard(bool_pred, bool_real))
 
         return np.average(results)
 
