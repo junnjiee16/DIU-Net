@@ -29,6 +29,7 @@ class ModifiedBinaryJaccardIndex:
             # the truth labels
             bool_pred = int_pred[i] == self.class_id
             bool_real = int_real[i] == self.class_id
+
             iou = self.jaccard(bool_pred, bool_real)
             results[i] = float(iou) if not torch.isnan(iou) else 0
 
@@ -69,7 +70,7 @@ class BinaryMIOU:
             flip_int_real = int_real[i] == 0
             target_iou = self.jaccard(flip_int_pred, flip_int_real)
 
-            miou = np.float32((background_iou + target_iou) / 2)
+            miou = (background_iou + target_iou) / 2
             results[i] = float(miou) if not torch.isnan(miou) else 0
 
         return np.average(results)
