@@ -20,8 +20,8 @@ from utils import ImageSegmentationDataset, BinaryMIOU
 # ---------------------------------------------
 
 LOGS_PATH = "May08_16-34-26_ipv-desktop_1module-inception-deeplabv3"
-CLEAN_DATA_DIR = "./data"
-ONSITE_DATA_DIR = "./onsite"
+CLEAN_DATA_DIR = "./data/model_training"
+ONSITE_DATA_DIR = "./data/onsite"
 with open(f"{LOGS_PATH}/results.json") as f:
     TRAINING_PARAMS = json.load(f)
 
@@ -75,14 +75,14 @@ transforms = v2.Compose(
 
 # create datasets
 original_test_set = ImageSegmentationDataset(
-    f"{CLEAN_DATA_DIR}/model_training/test/images",
-    f"{CLEAN_DATA_DIR}/model_training/test/image_masks",
+    f"{CLEAN_DATA_DIR}/test/images",
+    f"{CLEAN_DATA_DIR}/test/image_masks",
     transforms,
     transforms,
 )
 blurred_test_set = ImageSegmentationDataset(
-    f"{CLEAN_DATA_DIR}/model_training/test/images",
-    f"{CLEAN_DATA_DIR}/model_training/test/image_masks",
+    f"{CLEAN_DATA_DIR}/test/images",
+    f"{CLEAN_DATA_DIR}/test/image_masks",
     blur_transforms(ksize=KSIZE),
     transforms,
 )
