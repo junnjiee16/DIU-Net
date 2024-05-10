@@ -24,8 +24,11 @@ from deeplab import inception_deeplabv3
 # Training preparation
 # ---------------------------------------------
 DATASET_DIR = "./data/model_training"
+TRAIN_DATA_DIR = "train_augmented"
+VAL_DATA_DIR = "val_augmented"
+
 PARAMS = {
-    "description": "1module-inception-deeplabv3",
+    "model_name": "1module-inception-deeplabv3",
     "max_epochs": 60,
     "batch_size": 8,
     "learning_rate": 1e-5,
@@ -68,14 +71,14 @@ transforms = v2.Compose(
 
 # create dataset
 train_dataset = ImageSegmentationDataset(
-    f"{DATASET_DIR}/train_augmented/images",
-    f"{DATASET_DIR}/train_augmented/image_masks",
+    f"{DATASET_DIR}/{TRAIN_DATA_DIR}/images",
+    f"{DATASET_DIR}/{TRAIN_DATA_DIR}/image_masks",
     transforms,
     transforms,
 )
 val_dataset = ImageSegmentationDataset(
-    f"{DATASET_DIR}/val_augmented/images",
-    f"{DATASET_DIR}/val_augmented/image_masks",
+    f"{DATASET_DIR}/{VAL_DATA_DIR}/images",
+    f"{DATASET_DIR}/{VAL_DATA_DIR}/image_masks",
     transforms,
     transforms,
 )
@@ -89,7 +92,7 @@ val_dataloader = DataLoader(val_dataset, batch_size=PARAMS["batch_size"])
 # ---------------------------------------------
 # Model training
 # ---------------------------------------------
-writer = SummaryWriter(comment=f"_{PARAMS['description']}")
+writer = SummaryWriter(comment=f"_{PARAMS['model_name']}")
 logger = Logger(logdir=f"./{writer.get_logdir()}")
 
 loss_fn = nn.BCELoss()
