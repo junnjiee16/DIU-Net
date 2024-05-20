@@ -24,16 +24,16 @@ from deeplab import inception_deeplabv3
 # Training preparation
 # ---------------------------------------------
 DATASET_DIR = "./data/model_training"
-TRAIN_DATA_DIR = "train_augmented"
-VAL_DATA_DIR = "val_augmented"
+TRAIN_DATA_DIR = "train_augmented_v2"
+VAL_DATA_DIR = "val_augmented_v2"
 
 PARAMS = {
-    "model_name": "1module-inception-deeplabv3",
-    "max_epochs": 60,
+    "model_name": "3module-inception-deeplabv3-aug-v2",
+    "max_epochs": 45,
     "batch_size": 8,
     "learning_rate": 1e-5,
     "backbone": "resnet50",
-    "inception_modules": 1,
+    "inception_modules": 3,
 }
 
 # Check GPU availability
